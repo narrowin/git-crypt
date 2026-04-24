@@ -250,19 +250,31 @@ echo "    empty-file fix applied"
 
 # Empty blobs are expected for empty encrypted files. Do not warn on smudge for
 # exactly empty input, but keep warning on non-empty unencrypted blobs.
-if grep -Fq 'if (in.gcount() == 0) {' commands.cpp; then
+if awk '
+    /^int smudge / { in_smudge = 1 }
+    in_smudge && /if \(in[.]gcount\(\) == 0\) {/ { found = 1 }
+    in_smudge && /return decrypt_file_to_stream/ { in_smudge = 0 }
+    END { exit found ? 0 : 1 }
+' commands.cpp; then
     echo "    empty-smudge warning fix already present"
 else
-    sed -i.bak '/in.read.*header.*sizeof(header)/a\
+    sed -i.bak '/^int smudge /,/return decrypt_file_to_stream/ {
+        /^[[:space:]]*in[.]read(reinterpret_cast<char[*]>(header), sizeof(header));/a\
 \
     if (in.gcount() == 0) {\
         return 0;\
+    }
     }
 ' commands.cpp
     rm -f commands.cpp.bak
 fi
 
-if ! grep -Fq 'if (in.gcount() == 0) {' commands.cpp; then
+if ! awk '
+    /^int smudge / { in_smudge = 1 }
+    in_smudge && /if \(in[.]gcount\(\) == 0\) {/ { found = 1 }
+    in_smudge && /return decrypt_file_to_stream/ { in_smudge = 0 }
+    END { exit found ? 0 : 1 }
+' commands.cpp; then
     echo "error: empty-smudge warning patch did not apply" >&2
     exit 1
 fi
