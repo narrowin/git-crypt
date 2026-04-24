@@ -119,7 +119,12 @@ fi
 
 echo "    dependencies OK"
 
-# ── Step 2: Create temporary worktree ─────────────────────────────────────────
+# ── Step 2: Fetch upstream ────────────────────────────────────────────────────
+
+echo "==> Fetching upstream..."
+git -C "$REPO_ROOT" fetch upstream
+
+# ── Step 3: Create temporary worktree ─────────────────────────────────────────
 
 WORKTREE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/git-crypt-build.XXXXXX")"
 echo "==> Creating worktree at $WORKTREE_DIR..."
@@ -129,11 +134,6 @@ git -C "$REPO_ROOT" branch -D "$INTEGRATION_BRANCH" 2>/dev/null || true
 
 git -C "$REPO_ROOT" worktree add --detach "$WORKTREE_DIR" upstream/master
 cd "$WORKTREE_DIR"
-
-# ── Step 3: Fetch upstream ────────────────────────────────────────────────────
-
-echo "==> Fetching upstream..."
-git -C "$REPO_ROOT" fetch upstream
 
 UPSTREAM_SHA="$(git rev-parse HEAD)"
 echo "    upstream/master: $UPSTREAM_SHA"
