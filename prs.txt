@@ -1,0 +1,5 @@
+# Order matters: PRs are merged top-to-bottom.
+311  # Fix handling small files (data integrity bug)
+222  # Fix multiple worktrees (use common git dir)
+180  # Merge driver for secret files
+210  # Don't encrypt empty files in new repos (supersedes #162)
