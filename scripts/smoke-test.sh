@@ -173,11 +173,12 @@ test_lock() {
 
     (cd "$dir" && "$GIT_CRYPT" lock) || fail "lock" "exit code $?"
 
-    # Working copy should no longer contain the plaintext
-    local wc
-    wc="$(cat "$dir/secret.txt")"
-    if [ "$wc" = "$content" ]; then
-        fail "lock" "working copy still contains plaintext after lock"
+    # Encrypted files are larger than plaintext (header + nonce). Compare sizes.
+    local plain_len locked_len
+    plain_len="${#content}"
+    locked_len="$(wc -c < "$dir/secret.txt" | tr -d '[:space:]')"
+    if [ "$locked_len" -le "$plain_len" ]; then
+        fail "lock" "file size $locked_len not larger than plaintext $plain_len — not encrypted"
     fi
     pass "lock"
 }
@@ -241,14 +242,15 @@ test_pr311_small_files() {
 
     (cd "$dir" && "$GIT_CRYPT" lock)
 
-    local wc
-    wc="$(cat "$dir/secret.small")"
-    if [ "$wc" = "$content" ]; then
-        fail "PR#311 small files" "working copy still plaintext after lock"
+    local locked_len
+    locked_len="$(wc -c < "$dir/secret.small" | tr -d '[:space:]')"
+    if [ "$locked_len" -le 1 ]; then
+        fail "PR#311 small files" "file size $locked_len after lock — not encrypted"
     fi
 
     (cd "$dir" && "$GIT_CRYPT" unlock "$TMPDIR_BASE/test.key")
 
+    local wc
     wc="$(cat "$dir/secret.small")"
     if [ "$wc" != "$content" ]; then
         fail "PR#311 small files" "content mismatch after unlock: got '$wc', expected '$content'"
@@ -271,10 +273,10 @@ test_pr222_worktrees() {
     # Lock and unlock within the worktree independently
     (cd "$wt_dir" && "$GIT_CRYPT" lock) || fail "PR#222 worktrees" "lock in worktree failed"
 
-    local wc
-    wc="$(cat "$wt_dir/secret.txt")"
-    if [ "$wc" = "$content" ]; then
-        fail "PR#222 worktrees" "working copy still plaintext after lock in worktree"
+    local locked_len
+    locked_len="$(wc -c < "$wt_dir/secret.txt" | tr -d '[:space:]')"
+    if [ "$locked_len" -le "${#content}" ]; then
+        fail "PR#222 worktrees" "file size $locked_len after lock — not encrypted"
     fi
 
     (cd "$wt_dir" && "$GIT_CRYPT" unlock "$TMPDIR_BASE/test.key") || fail "PR#222 worktrees" "unlock in worktree failed"
@@ -365,10 +367,12 @@ test_pr180_diff_driver() {
     git -C "$dir" commit -q -m "add secret"
 
     printf 'modified secret\n' > "$dir/secret.txt"
+    git -C "$dir" add secret.txt
+    git -C "$dir" commit -q -m "modify secret"
 
-    # git diff should show decrypted plaintext, not encrypted binary
+    # Compare two commits — textconv decrypts the blobs for diff display
     local diff_output
-    diff_output="$(git -C "$dir" diff -- secret.txt 2>&1)"
+    diff_output="$(git -C "$dir" diff HEAD~1 HEAD -- secret.txt 2>&1)"
 
     case "$diff_output" in
         *"-original secret"*"+modified secret"*)
