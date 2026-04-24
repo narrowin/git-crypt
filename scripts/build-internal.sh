@@ -204,6 +204,20 @@ while IFS= read -r line || [ -n "$line" ]; do
     echo "    PR #$pr: merged"
 done < "$PR_FILE"
 
+# ── Step 5b: Apply fork-specific patches ──────────────────────────────────────
+
+echo "==> Applying fork patches..."
+
+# Use 'cat' for textconv instead of 'git-crypt diff'.
+# Git applies the smudge filter (decrypt) before textconv, so the file is
+# already plaintext. 'git-crypt diff' is redundant and fails on some git versions.
+sed -i.bak 's|escaped_git_crypt_path + " diff --key-name=" + key_name|"cat"|' commands.cpp
+sed -i.bak 's|escaped_git_crypt_path + " diff"|"cat"|' commands.cpp
+rm -f commands.cpp.bak
+
+git add -A && git commit -q -m "narrowin: use cat for textconv"
+echo "    textconv fix applied"
+
 # Capture the integration commit SHA now — before build/test/cleanup.
 INTEGRATION_SHA="$(git rev-parse HEAD)"
 

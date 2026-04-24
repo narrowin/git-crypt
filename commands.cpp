@@ -164,15 +164,13 @@ static void configure_git_filters (const char* key_name)
 		git_config(std::string("filter.git-crypt-") + key_name + ".clean",
 		           escaped_git_crypt_path + " clean --key-name=" + key_name);
 		git_config(std::string("filter.git-crypt-") + key_name + ".required", "true");
-		// Use 'cat' for textconv: git already applies the smudge filter (decrypt)
-		// before passing the file to textconv, so the content is already plaintext.
-		// Using 'git-crypt diff' here is redundant and fails on some git versions.
-		git_config(std::string("diff.git-crypt-") + key_name + ".textconv", "cat");
+		git_config(std::string("diff.git-crypt-") + key_name + ".textconv",
+		           escaped_git_crypt_path + " diff --key-name=" + key_name);
 	} else {
 		git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
 		git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
 		git_config("filter.git-crypt.required", "true");
-		git_config("diff.git-crypt.textconv", "cat");
+		git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
 	}
 }
 
