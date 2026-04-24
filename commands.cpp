@@ -472,6 +472,25 @@ static std::pair<std::string, std::string> get_file_attributes (const std::strin
 	return std::make_pair(filter_attr, diff_attr);
 }
 
+static bool check_if_blob_is_empty (const std::string& object_id)
+{
+	// git cat-file blob object_id
+
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("cat-file");
+	command.push_back("blob");
+	command.push_back(object_id);
+
+	// TODO: do this more efficiently - don't read entire command output into buffer, only read what we need
+	std::stringstream		output;
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git cat-file' failed - is this a Git repository?");
+	}
+
+	return output.get() == std::stringstream::traits_type::eof();
+}
+
 static bool check_if_blob_is_encrypted (const std::string& object_id)
 {
 	// git cat-file blob object_id
@@ -779,6 +798,10 @@ int clean (int argc, const char** argv, std::istream& in, std::ostream& out)
 	if (file_size >= Aes_ctr_encryptor::MAX_CRYPT_BYTES) {
 		std::clog << "git-crypt: error: file too long to encrypt securely" << std::endl;
 		return 1;
+	}
+
+	if (file_size == 0 && key_file.get_skip_empty()) {
+		return 0;
 	}
 
 	// We use an HMAC of the file as the encryption nonce (IV) for CTR mode.
@@ -1103,6 +1126,7 @@ int init (int argc, const char** argv)
 	std::clog << "Generating key..." << std::endl;
 	Key_file		key_file;
 	key_file.set_key_name(key_name);
+	key_file.set_skip_empty(true);
 	key_file.generate();
 
 	mkdir_parent(internal_key_path);
@@ -1538,6 +1562,7 @@ int keygen (int argc, const char** argv)
 
 	std::clog << "Generating key..." << std::endl;
 	Key_file		key_file;
+	key_file.set_skip_empty(true);
 	key_file.generate();
 
 	if (std::strcmp(key_file_name, "-") == 0) {
@@ -1742,7 +1767,8 @@ int status (int argc, const char** argv)
 
 		if (file_attrs.first == "git-crypt" || std::strncmp(file_attrs.first.c_str(), "git-crypt-", 10) == 0) {
 			// File is encrypted
-			const bool	blob_is_unencrypted = !object_id.empty() && !check_if_blob_is_encrypted(object_id);
+			// If the file is empty, don't consider it unencrypted, because in newly-initialized repos (specifically those with keys with skip_empty set) we don't encrypt empty files. Unfortunately, we can't easily determine here if the key has skip_empty set, so just act like it is. This means we won't notice if an old repo has an empty unencrypted file that should be encrypted. Fortunately, this isn't really a big deal because empty files obviously don't contain anything sensitive in them.
+			const bool	blob_is_unencrypted = !object_id.empty() && !check_if_blob_is_encrypted(object_id) && !check_if_blob_is_empty(object_id);
 
 			if (fix_problems && blob_is_unencrypted) {
 				if (access(filename.c_str(), F_OK) != 0) {
