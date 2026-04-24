@@ -26,6 +26,8 @@ curl -L -o ~/.local/bin/git-crypt https://github.com/narrowin/git-crypt/releases
 curl -L -o ~/.local/bin/git-crypt https://github.com/narrowin/git-crypt/releases/download/v0.8.0-narrowin/git-crypt-linux-amd64
 
 chmod +x ~/.local/bin/git-crypt
+~/.local/bin/git-crypt --version
+# git-crypt 0.8.0-narrowin
 ```
 
 Or build from source:
@@ -36,10 +38,28 @@ cd git-crypt
 git remote add upstream https://github.com/AGWA/git-crypt.git
 ./scripts/build-internal.sh
 # binary is at ./git-crypt
+./git-crypt --version
 ```
 
 **Dependencies (build only):** C++ compiler, Make, OpenSSL dev headers, Git.
 The build script checks for these and prints install hints if anything is missing.
+
+### Switching from upstream git-crypt
+
+If you already have repos unlocked with upstream git-crypt, you must clear the
+old filter config before unlocking with this fork. Otherwise `git-crypt unlock`
+will fail with `clean filter 'git-crypt' failed`.
+
+Run this **once per repo** that was previously unlocked with upstream:
+
+```sh
+git-crypt lock                                       # lock first if currently unlocked
+git config --remove-section filter.git-crypt         # remove stale smudge/clean filters
+git config --remove-section diff.git-crypt           # remove stale textconv filter
+git-crypt unlock                                     # unlock with the new binary
+```
+
+After that, lock/unlock works normally.
 
 ### Merge driver
 
