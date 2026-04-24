@@ -18,6 +18,8 @@ TAG_NAME=""
 WORKTREE_DIR=""
 INTEGRATION_BRANCH="internal"
 PR_LOG=""
+FORK_SUFFIX="narrowin"
+DISPLAY_VERSION=""
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -218,6 +220,27 @@ rm -f commands.cpp.bak
 git add -A && git commit -q -m "narrowin: use cat for textconv"
 echo "    textconv fix applied"
 
+# Mark the binary as a fork build while preserving the normal version format.
+BASE_VERSION="$(sed -n 's/^#define VERSION "\([^"]*\)"/\1/p' git-crypt.hpp | head -n 1)"
+if [ -z "$BASE_VERSION" ]; then
+    echo "error: could not read base version from git-crypt.hpp" >&2
+    exit 1
+fi
+
+DISPLAY_VERSION="${BASE_VERSION}-${FORK_SUFFIX}"
+
+sed -i.bak "s|#define VERSION \"[^\"]*\"|#define VERSION \"$DISPLAY_VERSION\"|" git-crypt.hpp
+rm -f git-crypt.hpp.bak
+
+if ! grep -Fq "#define VERSION \"$DISPLAY_VERSION\"" git-crypt.hpp; then
+    echo "error: failed to apply fork version patch" >&2
+    exit 1
+fi
+
+git add git-crypt.hpp
+git commit -q -m "narrowin: mark fork version"
+echo "    version marked as $DISPLAY_VERSION"
+
 # Capture the integration commit SHA now — before build/test/cleanup.
 INTEGRATION_SHA="$(git rev-parse HEAD)"
 
@@ -275,4 +298,5 @@ echo "==> Done. Binary at: $REPO_ROOT/git-crypt"
 echo "    Build provenance:"
 echo "    upstream/master: $UPSTREAM_SHA"
 echo "$PR_LOG"
+echo "    version:         $DISPLAY_VERSION"
 echo "    integration:     $INTEGRATION_SHA"

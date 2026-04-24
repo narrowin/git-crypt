@@ -96,7 +96,9 @@ mutates your checkout or branch state). Does exactly this, in order:
    exact source state is recorded.
 6. **Build** — runs `make clean && make`. On macOS, discovers Homebrew OpenSSL
    prefix via `brew --prefix openssl` (works on both Apple Silicon `/opt/homebrew`
-   and Intel `/usr/local`) and passes the paths via CXXFLAGS/LDFLAGS.
+   and Intel `/usr/local`) and passes the paths via CXXFLAGS/LDFLAGS. The
+   binary version is marked as a narrowin fork build before compiling, so
+   `git-crypt --version` is distinguishable from upstream.
 7. **Test** — runs `scripts/smoke-test.sh` against the freshly built binary.
    If any test fails, the script stops here — no tag, no "success" message.
 8. **Copy binary out** — copies the built `git-crypt` binary to the repo root.
@@ -126,7 +128,8 @@ Takes the binary path as an argument (defaults to `./git-crypt`).
 
 **Core tests (always run):**
 
-1. **Binary check** — `git-crypt --version` exits 0, prints version string.
+1. **Binary check** — `git-crypt --version` exits 0 and identifies the
+   narrowin fork build.
 2. **Init** — create a temp git repo, run `git-crypt init`, verify
    `.git/git-crypt` directory is created.
 3. **Encrypt cycle** — set up `.gitattributes` marking `secret.*` for encryption,

@@ -100,12 +100,12 @@ setup_secret_and_key() {
 
 echo "==> Core tests"
 
-# Test 1: Binary check — version exits 0 and prints something
+# Test 1: Binary check — version exits 0 and identifies the fork build
 test_version() {
     local output
     output="$("$GIT_CRYPT" --version 2>&1)" || fail "version" "exit code $?"
     case "$output" in
-        *[0-9]*.[0-9]*) ;;
+        git-crypt*[0-9]*.[0-9]*-narrowin*) ;;
         *) fail "version" "unexpected output: $output" ;;
     esac
     pass "version: $output"
