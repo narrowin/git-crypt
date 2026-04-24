@@ -13,8 +13,21 @@ includes unmerged upstream pull requests we depend on:
 
 ### Install
 
-Download a binary from [Releases](https://github.com/narrowin/git-crypt/releases)
-and put it on your PATH, or build from source:
+Download a binary from [Releases](https://github.com/narrowin/git-crypt/releases):
+
+```sh
+mkdir -p ~/.local/bin
+
+# macOS (Apple Silicon)
+curl -L -o ~/.local/bin/git-crypt https://github.com/narrowin/git-crypt/releases/download/v0.8.0-narrowin/git-crypt-darwin-arm64
+
+# Linux (amd64)
+curl -L -o ~/.local/bin/git-crypt https://github.com/narrowin/git-crypt/releases/download/v0.8.0-narrowin/git-crypt-linux-amd64
+
+chmod +x ~/.local/bin/git-crypt
+```
+
+Or build from source:
 
 ```sh
 git clone git@github.com:narrowin/git-crypt.git
@@ -24,7 +37,7 @@ git remote add upstream https://github.com/AGWA/git-crypt.git
 # binary is at ./git-crypt
 ```
 
-**Dependencies:** C++ compiler, Make, OpenSSL dev headers, Git.
+**Dependencies (build only):** C++ compiler, Make, OpenSSL dev headers, Git.
 The build script checks for these and prints install hints if anything is missing.
 
 ### Merge driver
