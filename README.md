@@ -89,13 +89,11 @@ git add path/to/empty-file
 git commit -m "Normalize empty git-crypt file"
 ```
 
-Do not migrate keys, re-run `git-crypt init`, or rewrite history for this
-change.
+No key changes or history rewrites are needed.
 
-Old git-crypt binaries can check out 0-byte empty files, but if an old binary
-re-adds one it may turn it back into the old 22-byte blob. Mixed old/new
-binaries can therefore cause small back-and-forth commits for empty files. Use
-this binary consistently to avoid that churn.
+If any team member still uses an older git-crypt binary, that binary will
+re-encrypt empty files back into the old 22-byte blob on commit, which can
+cause the same merge failures. Make sure everyone uses this fork's binary.
 
 ### Merge driver
 
