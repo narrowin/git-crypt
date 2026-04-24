@@ -1,3 +1,50 @@
+git-crypt - transparent file encryption in git (narrowin fork)
+==============================================================
+
+This is a fork of [AGWA/git-crypt](https://github.com/AGWA/git-crypt) that
+includes unmerged upstream pull requests we depend on:
+
+| PR | Description |
+|----|-------------|
+| [#311](https://github.com/AGWA/git-crypt/pull/311) | Fix handling small files (data integrity bug) |
+| [#222](https://github.com/AGWA/git-crypt/pull/222) | Fix multiple worktrees (use common git dir) |
+| [#180](https://github.com/AGWA/git-crypt/pull/180) | Merge driver for secret files |
+| [#210](https://github.com/AGWA/git-crypt/pull/210) | Don't encrypt empty files in new repos |
+
+### Install
+
+Download a binary from [Releases](https://github.com/narrowin/git-crypt/releases)
+and put it on your PATH, or build from source:
+
+```sh
+git clone git@github.com:narrowin/git-crypt.git
+cd git-crypt
+git remote add upstream https://github.com/AGWA/git-crypt.git
+./scripts/build-internal.sh
+# binary is at ./git-crypt
+```
+
+**Dependencies:** C++ compiler, Make, OpenSSL dev headers, Git.
+The build script checks for these and prints install hints if anything is missing.
+
+### Merge driver
+
+To enable the merge driver for encrypted files (PR #180), add `merge=git-crypt`
+to your `.gitattributes`:
+
+```
+secret.* filter=git-crypt diff=git-crypt merge=git-crypt
+```
+
+This lets git merge encrypted files as plaintext instead of failing with
+binary conflicts.
+
+---
+
+*Everything below is the upstream README.*
+
+---
+
 git-crypt - transparent file encryption in git
 ==============================================
 
