@@ -10,6 +10,7 @@ includes unmerged upstream pull requests we depend on:
 | [#222](https://github.com/AGWA/git-crypt/pull/222) | Fix multiple worktrees (use common git dir) |
 | [#180](https://github.com/AGWA/git-crypt/pull/180) | Merge driver for secret files |
 | [#210](https://github.com/AGWA/git-crypt/pull/210) | Don't encrypt empty files in new repos |
+| [#332](https://github.com/AGWA/git-crypt/pull/332) | Fix textconv producing empty diffs on Linux |
 
 ### Install
 
