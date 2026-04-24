@@ -165,7 +165,7 @@ static void configure_git_filters (const char* key_name)
 		           escaped_git_crypt_path + " clean --key-name=" + key_name);
 		git_config(std::string("filter.git-crypt-") + key_name + ".required", "true");
 		git_config(std::string("diff.git-crypt-") + key_name + ".textconv",
-		           escaped_git_crypt_path + " diff --key-name=" + key_name);
+		           "cat");
 		git_config(std::string("merge.git-crypt-") + key_name + ".name", "git-crypt merge driver");
 		git_config(std::string("merge.git-crypt-") + key_name + ".driver",
 		           escaped_git_crypt_path + " merge --key-name=" + key_name + " %A %O %B %L");
@@ -173,7 +173,7 @@ static void configure_git_filters (const char* key_name)
 		git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
 		git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
 		git_config("filter.git-crypt.required", "true");
-		git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+		git_config("diff.git-crypt.textconv", "cat");
 		git_config("merge.git-crypt.name", "git-crypt merge driver");
 		git_config("merge.git-crypt.driver", escaped_git_crypt_path + " merge %A %O %B %L");
 	}
