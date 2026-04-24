@@ -220,6 +220,59 @@ rm -f commands.cpp.bak
 git add -A && git commit -q -m "narrowin: use cat for textconv"
 echo "    textconv fix applied"
 
+# Store empty files as empty blobs for both old and new keys.
+# PR #210 gates this on a key-file flag, which leaves existing repos broken.
+if grep -Fq 'if (file_size == 0 && key_file.get_skip_empty()) {' commands.cpp; then
+    sed -i.bak 's/if (file_size == 0 && key_file.get_skip_empty()) {/if (file_size == 0) {/' commands.cpp
+    rm -f commands.cpp.bak
+elif grep -Fq 'if (file_size == 0) {' commands.cpp; then
+    echo "    empty-file fix already present"
+else
+    echo "error: empty-file clean patch target not found" >&2
+    exit 1
+fi
+
+if grep -Fq 'file_size == 0 && key_file.get_skip_empty()' commands.cpp; then
+    echo "error: empty-file clean patch left skip_empty-only logic in place" >&2
+    exit 1
+fi
+
+if ! grep -Fq 'if (file_size == 0) {' commands.cpp; then
+    echo "error: empty-file clean patch did not apply" >&2
+    exit 1
+fi
+
+if ! git diff --quiet -- commands.cpp; then
+    git add commands.cpp
+    git commit -q -m "narrowin: skip encryption for empty files"
+fi
+echo "    empty-file fix applied"
+
+# Empty blobs are expected for empty encrypted files. Do not warn on smudge for
+# exactly empty input, but keep warning on non-empty unencrypted blobs.
+if grep -Fq 'if (in.gcount() == 0) {' commands.cpp; then
+    echo "    empty-smudge warning fix already present"
+else
+    sed -i.bak '/in.read.*header.*sizeof(header)/a\
+\
+    if (in.gcount() == 0) {\
+        return 0;\
+    }
+' commands.cpp
+    rm -f commands.cpp.bak
+fi
+
+if ! grep -Fq 'if (in.gcount() == 0) {' commands.cpp; then
+    echo "error: empty-smudge warning patch did not apply" >&2
+    exit 1
+fi
+
+if ! git diff --quiet -- commands.cpp; then
+    git add commands.cpp
+    git commit -q -m "narrowin: do not warn when smudging empty files"
+fi
+echo "    empty-smudge warning fix applied"
+
 # Mark the binary as a fork build while preserving the normal version format.
 BASE_VERSION="$(sed -n 's/^#define VERSION "\([^"]*\)"/\1/p' git-crypt.hpp | head -n 1)"
 if [ -z "$BASE_VERSION" ]; then

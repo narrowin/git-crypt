@@ -83,6 +83,30 @@ make_encrypted_repo() {
     echo "$dir"
 }
 
+# Set up a repo using a migrated legacy key, which has no PR #210 skip_empty
+# header flag. This matches existing repos created before that PR.
+make_old_key_encrypted_repo() {
+    local name="${1:-old-key-encrypted}"
+    local dir
+    dir="$(make_repo "$name")"
+
+    local legacy_key="$TMPDIR_BASE/$name.legacy.key"
+    local migrated_key="$TMPDIR_BASE/$name.migrated.key"
+    dd if=/dev/urandom of="$legacy_key" bs=96 count=1 2>/dev/null \
+        || fail "old-key setup" "unable to create legacy key fixture"
+    "$GIT_CRYPT" migrate-key "$legacy_key" "$migrated_key" >/dev/null 2>&1 \
+        || fail "old-key setup" "unable to migrate legacy key fixture"
+
+    printf 'secret.* filter=git-crypt diff=git-crypt\n' > "$dir/.gitattributes"
+    git -C "$dir" add .gitattributes
+    git -C "$dir" commit -q -m "add gitattributes"
+
+    (cd "$dir" && "$GIT_CRYPT" unlock "$migrated_key") \
+        || fail "old-key setup" "unable to unlock with migrated legacy key"
+
+    echo "$dir"
+}
+
 # Create a secret file, commit it, and export the key.
 setup_secret_and_key() {
     local dir="$1"
@@ -413,7 +437,9 @@ test_pr210_empty_files() {
 
     (cd "$dir" && "$GIT_CRYPT" export-key "$TMPDIR_BASE/test.key")
 
-    (cd "$dir" && "$GIT_CRYPT" lock)
+    local lock_output
+    lock_output="$(cd "$dir" && "$GIT_CRYPT" lock 2>&1)" \
+        || fail "PR#210 empty files" "lock failed: $lock_output"
 
     # After lock, empty file should remain empty (not corrupted)
     local size
@@ -422,7 +448,12 @@ test_pr210_empty_files() {
         fail "PR#210 empty files" "empty file became $size bytes after lock"
     fi
 
-    (cd "$dir" && "$GIT_CRYPT" unlock "$TMPDIR_BASE/test.key")
+    local unlock_output
+    unlock_output="$(cd "$dir" && "$GIT_CRYPT" unlock "$TMPDIR_BASE/test.key" 2>&1)" \
+        || fail "PR#210 empty files" "unlock failed: $unlock_output"
+    case "$unlock_output" in
+        *"Warning: file not encrypted"*) fail "PR#210 empty files" "unlock warned on expected 0-byte blob: $unlock_output" ;;
+    esac
 
     size="$(wc -c < "$dir/secret.empty" | tr -d '[:space:]')"
     if [ "$size" != "0" ]; then
@@ -444,11 +475,90 @@ test_pr210_empty_files() {
     pass "PR#210 empty files (0-byte stays empty, non-empty still encrypts)"
 }
 
+# Existing repos have keys without PR #210's skip_empty flag. Empty files must
+# still clean to 0 bytes so old repos get the same behavior as new repos.
+test_empty_files_old_keys() {
+    local dir
+    dir="$(make_old_key_encrypted_repo "old-key-empty-test")"
+
+    touch "$dir/secret.empty"
+    git -C "$dir" add secret.empty
+    git -C "$dir" commit -q -m "add empty secret with old key"
+
+    local blob_size
+    blob_size="$(git -C "$dir" cat-file -s HEAD:secret.empty)"
+    if [ "$blob_size" != "0" ]; then
+        fail "old-key empty files" "committed blob is $blob_size bytes (should be 0)"
+    fi
+
+    printf 'not empty' > "$dir/secret.notempty"
+    git -C "$dir" add secret.notempty
+    git -C "$dir" commit -q -m "add non-empty secret with old key"
+
+    local notempty_blob
+    notempty_blob="$(git -C "$dir" cat-file -p HEAD:secret.notempty | head -c 10 | xxd -p)"
+    case "$notempty_blob" in
+        00474954435259505400*) ;;
+        *) fail "old-key empty files" "non-empty file wasn't encrypted (regression)" ;;
+    esac
+
+    pass "old-key empty files (0-byte stays empty, non-empty still encrypts)"
+}
+
+# The original empty-file failure surfaced through git's stash machinery, which
+# merge --autostash also uses. Exercise that path with an old key.
+test_empty_files_old_keys_stash_merge() {
+    local dir
+    dir="$(make_old_key_encrypted_repo "old-key-stash-merge-test")"
+
+    printf 'base public\n' > "$dir/public.txt"
+    printf 'base local\n' > "$dir/local.txt"
+    touch "$dir/secret.empty"
+    git -C "$dir" add public.txt local.txt secret.empty
+    git -C "$dir" commit -q -m "add base files"
+
+    local base_branch
+    base_branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD)"
+
+    git -C "$dir" checkout -q -b feature
+    git -C "$dir" checkout -q "$base_branch"
+    printf 'main branch change\n' >> "$dir/public.txt"
+    git -C "$dir" add public.txt
+    git -C "$dir" commit -q -m "main branch change"
+
+    git -C "$dir" checkout -q feature
+    printf 'dirty local change\n' >> "$dir/local.txt"
+
+    local stash_output
+    stash_output="$(git -C "$dir" stash create 2>&1)" \
+        || fail "old-key stash" "git stash create failed: $stash_output"
+    case "$stash_output" in
+        *"fatal: stash failed"*) fail "old-key stash" "$stash_output" ;;
+    esac
+
+    local merge_output
+    merge_output="$(git -C "$dir" merge --autostash "$base_branch" 2>&1)" \
+        || fail "old-key merge autostash" "$merge_output"
+
+    case "$(cat "$dir/public.txt")" in
+        *"main branch change"*) ;;
+        *) fail "old-key merge autostash" "merge did not bring in main branch change" ;;
+    esac
+    case "$(cat "$dir/local.txt")" in
+        *"dirty local change"*) ;;
+        *) fail "old-key merge autostash" "autostash did not restore local change" ;;
+    esac
+
+    pass "old-key empty files (stash/create and merge --autostash succeed)"
+}
+
 test_pr311_small_files
 test_pr222_worktrees
 test_pr180_merge_driver
 test_diff_driver
 test_pr210_empty_files
+test_empty_files_old_keys
+test_empty_files_old_keys_stash_merge
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ includes unmerged upstream pull requests we depend on:
 | [#311](https://github.com/AGWA/git-crypt/pull/311) | Fix handling small files (data integrity bug) |
 | [#222](https://github.com/AGWA/git-crypt/pull/222) | Fix multiple worktrees (use common git dir) |
 | [#180](https://github.com/AGWA/git-crypt/pull/180) | Merge driver for secret files |
-| [#210](https://github.com/AGWA/git-crypt/pull/210) | Don't encrypt empty files in new repos |
+| [#210](https://github.com/AGWA/git-crypt/pull/210) | Don't encrypt empty files, including existing repos with old keys |
 | [#332](https://github.com/AGWA/git-crypt/pull/332) | Fix textconv producing empty diffs on Linux |
 
 ### Install
@@ -60,6 +60,42 @@ git-crypt unlock                                     # unlock with the new binar
 ```
 
 After that, lock/unlock works normally.
+
+### Empty encrypted files
+
+This fork stores empty files that match a `git-crypt` filter pattern as true
+0-byte Git blobs. Older git-crypt versions stored those files as 22-byte
+`GITCRYPT` header blobs. The old blobs contain no secret content, but they can
+break `git stash` or `git merge --autostash` with errors such as:
+
+```text
+fatal: stash failed
+```
+
+All users who commit to repositories using this fork should upgrade to this
+binary before making changes.
+
+After upgrading, run:
+
+```sh
+git status
+```
+
+If an empty file under a git-crypt pattern appears modified, stage and commit it
+once:
+
+```sh
+git add path/to/empty-file
+git commit -m "Normalize empty git-crypt file"
+```
+
+Do not migrate keys, re-run `git-crypt init`, or rewrite history for this
+change.
+
+Old git-crypt binaries can check out 0-byte empty files, but if an old binary
+re-adds one it may turn it back into the old 22-byte blob. Mixed old/new
+binaries can therefore cause small back-and-forth commits for empty files. Use
+this binary consistently to avoid that churn.
 
 ### Merge driver
 
